@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sebuah Pesan Spesial</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --sky-blue: #caf0f8;
+            --cloud-white: #ffffff;
+            --mail-red: #e63946;
+            --btn-green: #2a9d8f;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: var(--sky-blue);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* Langit & Awan */
+        .sky {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none; /* Agar tidak mengganggu klik */
+        }
+
+        .cloud {
+            position: absolute;
+            background: var(--cloud-white);
+            border-radius: 50px;
+            opacity: 0.8;
+            animation: drift linear infinite;
+        }
+
+        @keyframes drift {
+            from { transform: translateX(-150px); }
+            to { transform: translateX(110vw); }
+        }
+
+        /* Pesawat Kertas */
+        #plane {
+            position: absolute;
+            font-size: 35px;
+            left: -50px;
+            top: 50%;
+            z-index: 5;
+            display: none;
+            pointer-events: none;
+        }
+
+        .flying {
+            display: block !important;
+            animation: flightPath 4s ease-in-out forwards;
+        }
+
+        @keyframes flightPath {
+            0% { left: -50px; top: 50%; transform: rotate(0deg); }
+            30% { left: 20%; top: 25%; transform: rotate(-20deg); }
+            60% { left: 50%; top: 65%; transform: rotate(20deg); }
+            100% { left: calc(50% - 15px); top: calc(50% + 30px); transform: rotate(0deg) scale(0.4); opacity: 0; }
+        }
+
+        /* Container Utama */
+        .mailbox-container {
+            position: relative;
+            z-index: 10; /* Z-index tinggi agar di atas kembang api */
+            text-align: center;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .mailbox {
+            font-size: 80px;
+            transition: transform 0.3s;
+        }
+
+        /* Surat yang Muncul */
+        #letter {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 85%;
+            max-width: 350px;
+            background: white;
+            padding: 25px 20px;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            z-index: 15;
+            transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 3px dashed var(--mail-red);
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #letter.show {
+            transform: translate(-50%, -130%) scale(1);
+        }
+
+        .question {
+            font-size: 1rem;
+            color: #333;
+            line-height: 1.6;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        /* Tombol-tombol */
+        button {
+            cursor: pointer;
+            border: none;
+            outline: none;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        button:active { transform: scale(0.95); }
+
+        #btn-launch {
+            padding: 12px 30px;
+            font-size: 18px;
+            background-color: var(--mail-red);
+            color: white;
+            border-radius: 30px;
+            box-shadow: 0 5px 15px rgba(230, 57, 70, 0.4);
+            margin-bottom: 20px;
+        }
+
+        .btn-yes {
+            background-color: var(--btn-green);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 4px 10px rgba(42, 157, 143, 0.4);
+        }
+        
+        .btn-yes:hover { background-color: #218c7e; }
+        .btn-yes:disabled { background-color: #ccc; cursor: default; transform: none; }
+
+        /* Responsif untuk layar besar */
+        @media (min-width: 768px) {
+            .mailbox { font-size: 100px; }
+            .question { font-size: 1.3rem; }
+            #btn-launch { font-size: 20px; padding: 15px 35px; }
+            #plane { font-size: 50px; }
+            @keyframes flightPath {
+                100% { left: calc(50% - 25px); top: calc(50% + 50px); transform: rotate(0deg) scale(0.5); opacity: 0; }
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sky" id="sky"></div>
+    <div id="plane">✈️</div>
+
+    <div class="mailbox-container">
+        <button id="btn-launch">Kirim Pesan Rahasia 💌</button>
+        <div class="mailbox" id="mailbox">📮</div>
+        
+        <div id="letter">
+            <div class="question">
+                Aku udah bosen jadi temen kamu<br>
+                aku mau pindah jabatan jadi partner kamu.<br><br>
+                <strong>Lowongannya masih buka, kan?</strong>"
+            </div>
+            <button id="btn-yes" class="btn-yes">Klik jika mau</button>
+        </div>
+    </div>
+
+    <script>
+        // --- BAGIAN 1: Setup Awan & Elemen Dasar ---
+        const sky = document.getElementById('sky');
+        const cloudCount = window.innerWidth < 768 ? 5 : 10;
+        
+        for (let i = 0; i < cloudCount; i++) {
+            let cloud = document.createElement('div');
+            cloud.className = 'cloud';
+            cloud.style.width = Math.random() * 100 + 80 + 'px';
+            cloud.style.height = '40px';
+            cloud.style.top = Math.random() * 75 + '%';
+            cloud.style.left = Math.random() * 100 + '%';
+            cloud.style.animationDuration = Math.random() * 20 + 15 + 's';
+            cloud.style.animationDelay = Math.random() * 5 + 's';
+            sky.appendChild(cloud);
+        }
+
+        const btnLaunch = document.getElementById('btn-launch');
+        const plane = document.getElementById('plane');
+        const letter = document.getElementById('letter');
+        const mailbox = document.getElementById('mailbox');
+        const btnYes = document.getElementById('btn-yes');
+
+        // --- BAGIAN 2: Animasi Pesawat & Surat ---
+        btnLaunch.addEventListener('click', () => {
+            btnLaunch.style.display = 'none';
+            plane.classList.add('flying');
+
+            // Waktu tunggu sampai pesawat mendarat (4 detik)
+            setTimeout(() => {
+                mailbox.innerHTML = '📬'; // Kotak surat terbuka
+                mailbox.style.transform = 'scale(1.1)';
+                
+                // Munculkan surat setelah kotak terbuka
+                setTimeout(() => {
+                    letter.classList.add('show');
+                }, 500);
+            }, 4000);
+        });
+
+        // --- BAGIAN 3: Efek Kembang Api Meriah ---
+        btnYes.addEventListener('click', () => {
+            // Ubah tombol agar tidak diklik lagi
+            btnYes.textContent = "Yeay akhirnya naik level 🎉";
+            btnYes.disabled = true;
+
+            // Durasi kembang api (contoh: 5 detik)
+            var duration = 5 * 1000;
+            var animationEnd = Date.now() + duration;
+            var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+            function randomInRange(min, max) {
+              return Math.random() * (max - min) + min;
+            }
+
+            // Interval untuk menembakkan kembang api berulang kali
+            var interval = setInterval(function() {
+              var timeLeft = animationEnd - Date.now();
+
+              if (timeLeft <= 0) {
+                return clearInterval(interval);
+              }
+
+              var particleCount = 50 * (timeLeft / duration);
+              
+              // Tembakkan dari kiri bawah dan kanan bawah secara bergantian
+              confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+              confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+            }, 250);
+
+            // Optional: Munculkan alert setelah kembang api selesai
+            setTimeout(() => {
+                alert("Terima kasih sudah memilih 'Mau'. Ini hari terbaikku! ❤️");
+            }, duration + 500);
+        });
+    </script>
+</body>
+</html>
